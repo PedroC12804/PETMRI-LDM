@@ -56,7 +56,7 @@ TRAIN_CONFIG = {
     "batch_size": 8,
     "learning_rate": 1e-4,
     "num_epochs": 350,
-    "num_workers": 3,
+    "num_workers": 0,
     "log_every": 10,
     "save_every": 20,
     "warmup_steps": 500,
@@ -404,7 +404,7 @@ def visualize_generation(
     # Log to wandb
     # ============================================
     wandb.log({
-        "generated_samples": wandb.Image(save_path)
+        "generated_samples": wandb.Image(save_figure)
     })
 
 # ============================================
@@ -454,13 +454,9 @@ if __name__ == "__main__":
     print(f"Val: {len(val_exams)} exams")
     print(f"Test: {len(test_exams)} exams")
 
-    #mytransform = torchvision.Compose([
-        #torchvision.RandomHorizontalFlip(p=0.5),
-        #torchvision.RandomAffine(degrees=5, translate=(0.02, 0.02)),
-    #])
 
     # Create PET datasets
-    train_dataset = PETMRISliceDataset(train_exams, target_size=AE_CONFIG["target_size"])
+    train_dataset = PETMRISliceDataset(train_exams, target_size=AE_CONFIG["target_size"], transform=True)
     val_dataset = PETMRISliceDataset(val_exams, target_size=AE_CONFIG["target_size"])
     test_dataset = PETMRISliceDataset(test_exams, target_size=AE_CONFIG["target_size"])
 

@@ -2,8 +2,9 @@ import torch
 from torch.utils.data import Dataset
 import nibabel as nib
 import torchvision.transforms.v2 as torchvision
-from pathlib import Path
 import numpy as np
+import torchvision.transforms.functional as TF
+import random
 
 
 class PETMRISliceDataset(Dataset):
@@ -12,11 +13,13 @@ class PETMRISliceDataset(Dataset):
         self,
         exam_dirs,
         target_size=(256, 256),
+        transform=False,
 
     ):
         self.volume_cache = {}
         self.target_size = target_size
         self.resize = torchvision.Resize(target_size)
+        self.transform = transform
 
         self.samples = []
 
@@ -148,5 +151,35 @@ class PETMRISliceDataset(Dataset):
 
         if mri_tensor.shape[1:] != self.target_size:
             mri_tensor = self.resize(mri_tensor)
+
+        if self.transform:
+
+            if random.random() < 0.5:
+                pet_tensor = TF.hflip(pet_tensor)
+                mri_tensor = TF.hflip(mri_tensor)
+
+            angle = random.uniform(-10, 10)
+
+            pet_tensor = TF.rotate(pet_tensor, angle)
+            mri_tensor = TF.rotate(mri_tensor, angle)
+
+            tx = random.uniform(-0.02, 0.02) * pet_tensor.shape[-1]
+            ty = random.uniform(-0.02, 0.02) * pet_tensor.shape[-2]
+
+            pet_tensor = TF.affine(
+                pet_tensor,
+                angle=0,
+                translate=(int(tx), int(ty)),
+                scale=1.0,
+                shear=0
+            )
+
+            mri_tensor = TF.affine(
+                mri_tensor,
+                angle=0,
+                translate=(int(tx), int(ty)),
+                scale=1.0,
+                shear=0
+            )
 
         return pet_tensor, mri_tensor
