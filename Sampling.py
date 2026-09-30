@@ -1,17 +1,8 @@
 """
-Generates result-section figures for one patient: loads a trained
-checkpoint, picks a slice (middle by default), runs full
-reverse-diffusion sampling, and saves MRI / LD-PET / Ground Truth /
-Generated / Absolute Error as separate, clean (no axes/titles) PNG
-images -- suitable for composing into a paper figure.
 
 Usage:
     python sample_for_figures.py --patient_dir /path/to/PATIENT_ID \
                                   --checkpoint /path/to/diffusion_final_..._fold0.pth
-
-IMPORTANT: adjust CHECKPOINT_DIR/AE_CHECKPOINT_PATH defaults and the
-`from train_diffusion_MRI import sample_batch` line below to match
-your actual training script's filename.
 """
 
 import argparse
@@ -31,15 +22,8 @@ from metrics import compute_all_metrics
 from models.PET_KL_Autoencoder import KLAutoencoder
 from models.diffusion_model_MRI import ConditionalUNet
 from models.Condition_Encoder import Condition_Encoder
+from train_diffusion_MRI import sample_batch, make_kfold_splits 
 
-# Reuses the EXACT sampling loop AND fold-splitting logic from the
-# training script, so the test-set membership check below is
-# guaranteed to match how folds were actually built.
-from train_diffusion_MRI import sample_batch, make_kfold_splits  # <-- adjust to your actual training script filename
-
-# ============================================================
-# Must match your training script's dataset root / fold settings
-# exactly, or the recomputed splits won't match what was trained.
 # ============================================================
 DATASET_ROOT = Path("/home/pedrocarreiro/Desktop/Dataset_Normalized3/")
 N_FOLDS = 5
@@ -90,15 +74,7 @@ def verify_patient_in_fold_test_set(patient_dir, fold_idx):
 
 
 def parse_train_on_external_from_filename(checkpoint_path):
-    """
-    Your run_name includes an "exttrain{0|1}" tag even though the
-    checkpoint's saved config dict doesn't store train_on_external
-    directly. Parse it from the filename instead -- no checkpoint
-    patching or retraining needed.
-
-    Returns True/False if the tag is found, or None if this
-    checkpoint predates the tag (older run_name format).
-    """
+    
     match = re.search(r"exttrain(\d)", str(checkpoint_path))
     if match is None:
         return None
@@ -106,12 +82,7 @@ def parse_train_on_external_from_filename(checkpoint_path):
 
 
 def get_external_split(external_dataset_root, external_train_ratio, seed=EXTERNAL_SPLIT_SEED):
-    """
-    Reproduces the EXACT external train/test split used during
-    training -- deterministic given the same directory listing, ratio,
-    and seed. No retraining needed; this recomputes the same
-    random.Random(seed).shuffle(...) call training already made.
-    """
+
     external_exams = sorted([d for d in external_dataset_root.iterdir() if d.is_dir()])
     external_exams_shuffled = external_exams.copy()
     random.Random(seed).shuffle(external_exams_shuffled)
@@ -123,13 +94,7 @@ def get_external_split(external_dataset_root, external_train_ratio, seed=EXTERNA
 
 
 def verify_patient_in_external_split(patient_dir, external_train_ratio=EXTERNAL_TRAIN_RATIO):
-    """
-    Checks whether `patient_dir` (an external-dataset patient) falls
-    in the external TRAIN portion (already seen by every fold's model,
-    if TRAIN_ON_EXTERNAL was used) or the external TEST portion
-    (genuinely held out). Raises loudly on a train-set patient, same
-    reasoning as verify_patient_in_fold_test_set.
-    """
+   
     external_train_exams, external_test_exams = get_external_split(
         EXTERNAL_TEST_DATASET_ROOT, external_train_ratio, EXTERNAL_SPLIT_SEED
     )
@@ -151,11 +116,8 @@ def verify_patient_in_external_split(patient_dir, external_train_ratio=EXTERNAL_
               f"({EXTERNAL_TEST_DATASET_ROOT}) at all.")
 
 # ============================================================
-# DEFAULTS -- override via CLI args below, or edit directly
+# DEFAULTS
 # ============================================================
-DEFAULT_AE_CHECKPOINT_PATH = Path(
-    "/home/pedrocarreiro/Desktop/Latent_Diffusion_Model/checkpoints/kl_autoencoder_best.pth"
-)
 DEFAULT_OUTPUT_DIR = Path(
     "/home/pedrocarreiro/Desktop/Latent_Diffusion_Model/result_figures"
 )
@@ -166,12 +128,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def load_diffusion_model(checkpoint_path, device):
-    """
-    Reconstructs the exact model architecture from the config stored
-    inside the checkpoint itself (use_mri/use_ldpet/use_dose_cond/
-    target_dose) -- self-describing, so this always matches whatever
-    that checkpoint was actually trained with.
-    """
+  
     checkpoint = torch.load(checkpoint_path, weights_only=False, map_location=device)
     config = dict(checkpoint["config"])  # copy, so we can safely add to it
     if "fold" in checkpoint:
@@ -213,12 +170,7 @@ def save_clean_image(array, save_path, cmap="hot", vmin=None, vmax=None):
 
 
 def find_slice_sample(patient_dir, target_dose, target_size, slice_z=None):
-    """
-    Builds a SliceDataset for just this one patient -- reusing the
-    exact same loading/reorientation/crop logic used in
-    training/evaluation -- and returns (dataset, sample_index) for
-    the requested slice, or the middle slice if slice_z is None.
-    """
+    
     dataset = SliceDataset([patient_dir], target_size=target_size, dose_levels=[target_dose])
 
     if len(dataset) == 0:
