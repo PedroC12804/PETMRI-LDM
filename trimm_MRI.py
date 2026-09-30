@@ -81,7 +81,7 @@ def process_dataset(root_dir):
         # --------------------------------------------------------
         # Registered MRI
         # --------------------------------------------------------
-        reg_dir = exam_dir / "MRI_registered"
+        reg_dir = exam_dir / "MRI_registered2"
 
         reg_files = list(
             reg_dir.glob("*.nii.gz")
@@ -99,7 +99,7 @@ def process_dataset(root_dir):
         pet_dir = exam_dir / "PET"
 
         json_files = list(
-            pet_dir.glob("*.json")
+            pet_dir.glob("*nii.json")
         )
 
         if len(json_files) == 0:
@@ -111,7 +111,7 @@ def process_dataset(root_dir):
         # --------------------------------------------------------
         # Output
         # --------------------------------------------------------
-        output_dir = exam_dir / "MRI_trimmed"
+        output_dir = exam_dir / "MRI_trimmed2"
         output_dir.mkdir(exist_ok=True)
 
         output_path = (
@@ -135,6 +135,6 @@ def process_dataset(root_dir):
 
 if __name__ == "__main__":
 
-    root_dir = "/home/pedrocarreiro/Desktop/Dataset_Normalized3"
+    root_dir = "/home/pedrocarreiro/Desktop/Dataset_2"
 
     process_dataset(root_dir)

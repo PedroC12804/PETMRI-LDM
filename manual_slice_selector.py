@@ -176,8 +176,8 @@ def process_all_exams(root_dir, output_suffix="_trimmed.nii.gz", exam_subset=Non
 
 if __name__ == "__main__":
     # Example usage
-    root_dir = Path("/home/pedrocarreiro/Desktop/Dataset_Normalized3/")
+    root_dir = Path("/home/pedrocarreiro/Desktop/Dataset_2/")
     # To process all exams:
     #process_all_exams(root_dir)
     # To process only specific exams:
-    process_all_exams(root_dir, exam_subset=["4301473"])
+    process_all_exams(root_dir, exam_subset=["5974235"])

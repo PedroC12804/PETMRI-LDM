@@ -174,7 +174,7 @@ def process_dataset(root_dir):
         # --------------------------------------------------------
         # Output
         # --------------------------------------------------------
-        output_dir = exam_dir / "MRI_registered"
+        output_dir = exam_dir / "MRI_registered2"
         output_dir.mkdir(exist_ok=True)
 
         output_path = (
@@ -198,6 +198,6 @@ def process_dataset(root_dir):
 
 if __name__ == "__main__":
 
-    root_dir = "/home/pedrocarreiro/Desktop/Dataset_Normalized3"
+    root_dir = "/home/pedrocarreiro/Desktop/Dataset_2"
 
     process_dataset(root_dir)
