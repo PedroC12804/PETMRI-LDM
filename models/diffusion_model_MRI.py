@@ -127,14 +127,18 @@ class ConditionalUNet(nn.Module):
         self,
         latent_dim=32,
         time_dim=256,
-        cond_dim = 512,
+        use_mri=True,
+        use_ldpet=True,
+        use_dose_cond = False
     ):
 
         super().__init__()
 
+
         # ====================================================
-        # Time embedding
+        # Time and Dose embedding
         # ====================================================
+        self.use_dose_cond = use_dose_cond
 
         self.time_mlp = nn.Sequential(
             SinusoidalPositionEmbeddings(time_dim),
@@ -143,6 +147,20 @@ class ConditionalUNet(nn.Module):
             nn.Linear(time_dim, time_dim),
         )
 
+        self.dose_mlp = nn.Sequential(
+            SinusoidalPositionEmbeddings(time_dim),
+            nn.Linear(time_dim, time_dim),
+            nn.SiLU(),
+            nn.Linear(time_dim, time_dim),
+        )
+
+        # ====================================================
+        # Channel Conditioning
+        # ====================================================
+        self.use_mri = use_mri
+        self.use_ldpet = use_ldpet
+        mri_ch4, mri_ch8, mri_ch16 = (512, 512, 256) if use_mri else (0, 0, 0)
+        ldpet_ch4, ldpet_ch8, ldpet_ch16 = (512, 512, 256) if use_ldpet else (0, 0, 0)
         # ====================================================
         # Initial projection
         # ====================================================
@@ -170,7 +188,7 @@ class ConditionalUNet(nn.Module):
         # Bottleneck
         # ====================================================
 
-        self.mid1 = ResBlock(1024, 512, time_dim)
+        self.mid1 = ResBlock(512 + mri_ch4 + ldpet_ch4, 512, time_dim) #accomodates the change in channels due to conditioning
 
         self.mid2 = ResBlock(512, 512, time_dim)
 
@@ -179,10 +197,11 @@ class ConditionalUNet(nn.Module):
         # ====================================================
 
         self.up1 = Upsample(512)
-        self.dec1 = ResBlock(1536, 512, time_dim)
+        self.dec1 = ResBlock(512 + 512 + mri_ch8 + ldpet_ch8, 512, time_dim)  # up1 out + s2 + extras
+
 
         self.up2 = Upsample(512)
-        self.dec2 = ResBlock(1024, 256, time_dim)
+        self.dec2 = ResBlock(512 + 256 + mri_ch16 + ldpet_ch16, 256, time_dim)
 
         self.final = nn.Sequential(
             nn.GroupNorm(8, 256),
@@ -191,13 +210,26 @@ class ConditionalUNet(nn.Module):
         )
 
 
-    def forward(self, x, timesteps, mri_features):
+    def forward(self, x, timesteps, dose_level, mri_features=None, ldpet_features=None):
 
         # ====================================================
         # timestep embeddings
         # ====================================================
 
         t = self.time_mlp(timesteps)
+
+        if self.use_dose_cond:
+            dose_emb = self.dose_mlp(dose_level)
+            t = t + dose_emb
+
+        # ====================================================
+        # Conditioning
+        # ====================================================
+
+        if self.use_mri:
+            assert mri_features is not None
+        if self.use_ldpet:
+            assert ldpet_features is not None
 
         # ====================================================
         # initial
@@ -222,10 +254,13 @@ class ConditionalUNet(nn.Module):
         # bottleneck
         # ====================================================
 
-        x = torch.cat(
-            [x, mri_features["4"]],
-            dim=1
-        )
+        parts = [x]
+        if self.use_mri:
+            parts.append(mri_features["4"])
+        if self.use_ldpet:
+            parts.append(ldpet_features["4"])
+        x = torch.cat(parts, dim=1) #Concatenate the wanted features according to the specific run
+
         x = self.mid1(x, t)
 
         x = self.mid2(x, t)
@@ -235,11 +270,21 @@ class ConditionalUNet(nn.Module):
         # ====================================================
 
         x = self.up1(x)
-        x = torch.cat([x, s2, mri_features["8"]], dim=1)
+        parts = [x, s2]
+        if self.use_mri:
+            parts.append(mri_features["8"])
+        if self.use_ldpet:
+            parts.append(ldpet_features["8"])
+        x = torch.cat(parts, dim=1)
         x = self.dec1(x, t)
 
         x = self.up2(x)
-        x = torch.cat([x, s1, mri_features["16"]], dim=1)
+        parts = [x, s1]
+        if self.use_mri:
+            parts.append(mri_features["16"])
+        if self.use_ldpet:
+            parts.append(ldpet_features["16"])
+        x = torch.cat(parts, dim=1)
         x = self.dec2(x, t)
 
         return self.final(x)
